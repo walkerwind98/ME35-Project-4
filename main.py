@@ -33,16 +33,42 @@ def main():
     speed = 0
     y_ang = 0
     x_ang = 0
+    isTurnLeft= False
+    isTurnRight= False
     light_value = 45
     x_motor.reset_angle(0)
     y_motor.reset_angle(0)
+    counter = 0
 
     while True:
-        x_motor.angle()
-        y_motor.angle()
+        counter = counter + 1
+        x_ang= x_motor.angle()
+        y_ang= y_motor.angle()
 
-        while light_value < 100 :
-            x_motor.stop
+        if x_ang > 70:
+            isTurnRight = True
+        if x_ang < 70:
+            isTurnLeft = True
+        #send angle values or protocol to the other ev3
+
+        #get light value from other ev3
+
+        """ while light_value < 100 :
+            x_motor.stop(Stop.BRAKE)
+            y_motor.stop(Stop.BRAKE) """
+
+        if counter%100 is 0:
+            x_motor.stop(Stop.BRAKE)
+            y_motor.stop(Stop.BRAKE)
+            wait(1000)
+
+        isTurnLeft= False
+        isTurnRight= False
+        
+
+
+
+
 
 
 
