@@ -1,69 +1,28 @@
 #!/usr/bin/env pybricks-micropython
-#Project 4: Joystick with Feedback
-from pybricks import ev3brick as brick
+from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import (Motor, TouchSensor, ColorSensor,
                                  InfraredSensor, UltrasonicSensor, GyroSensor)
-from pybricks.parameters import (Port, Stop, Direction, Button, Color,
-                                 SoundFile, ImageFile, Align)
-from pybricks.tools import print, wait, StopWatch
+from pybricks.parameters import Port, Stop, Direction, Button, Color
+from pybricks.tools import wait, StopWatch
 from pybricks.robotics import DriveBase
+from pybricks.media.ev3dev import SoundFile, ImageFile
+from pybricks.iodevices import AnalogSensor, UARTDevice
+import time
+# Write your program here
+ev3 = EV3Brick()
 
-from pybricks.ev3devio import Ev3devSensor 
+ev3.speaker.set_volume(100)
+ev3.speaker.say("Jeremy Can of Ski")
 
-import ubinascii, ujson, urequests, utime
+xnum=""
+ynum=""
+def padder(xnum,ynum):
 
-""" import ev3dev2
-from ev3dev2.port import LegoPort """
+    xnum = "% 5s" % xnum
+    ynum = "% 5s" % ynum
+    
+    return "(" + xnum + "," + ynum + ")"
 
-""" class MySensor(Ev3devSensor):  #Define Class 
-    _ev3dev_driver_name="ev3-analog-01"
-    #do not forget to set port mode to EV3-Analog 
-    def readvalue(self):
-        self._mode('ANALOG')
-        return self._value(0) """
-
-
-# Before running the code go to Device Browser and Sensors. Make sure you can see ev3-analog-01, otherwise you will get an error.
-
-def SL_setup():
-     urlBase = "https://api.systemlinkcloud.com/nitag/v2/tags/"
-     headers = {"Accept":"application/json","x-ni-api-key":'HiJL-xViqSKa6rWkA7Nhwwa8F_d6D2UaK3SkOKUo7n'}
-     return urlBase, headers
-     
-def Put_SL(Tag, Type, Value):
-     urlBase, headers = SL_setup()
-     urlValue = urlBase + Tag + "/values/current"
-     propValue = {"value":{"type":Type,"value":Value}}
-     
-     try:
-          print(urlValue,headers=headers,json=propValue)
-          reply = urequests.put(urlValue,headers=headers,json=propValue).text
-     except Exception as e:
-          print(e)         
-          reply = 'failed'
-     return reply
-
-def Get_SL(Tag):
-     urlBase, headers = SL_setup()
-     urlValue = urlBase + Tag + "/values/current"
-     try:
-          value = urequests.get(urlValue,headers=headers).text
-          data = ujson.loads(value)
-          print(data)
-          result = data.get("value").get("value")
-     except Exception as e:
-          print(e)
-          result = 'failed'
-     return result
-     
-def Create_SL(Tag, Type):
-     urlBase, headers = SL_setup()
-     urlTag = urlBase + Tag
-     propName={"type":Type,"path":Tag}
-     try:
-          urequests.put(urlTag,headers=headers,json=propName).text
-     except Exception as e:
-          print(e)
 
 def mapper(y_ang):
  #mapping function stuff
@@ -82,13 +41,33 @@ def mapper(y_ang):
     yScaled = targetMin + targetSpan*((float(y_ang - yMin)/ float(ySpan)))
     return yScaled
 
+def MotorAngles(x_motor,y_motor):
+    x_ang= x_motor.angle()
+    y_ang= y_motor.angle()
+    #print("X Motor is ", x_ang," Y motor is ", y_ang)
+    #Pad for digits to send the data for x and y position as strings
+
+    x_ang= str(x_ang)
+    y_ang= str(y_ang)
+    anglestring = padder(x_ang, y_ang) 
+    #print(len(anglestring))
+    print(anglestring)
+    return anglestring, x_ang,y_ang
+
+
+sense = AnalogSensor(Port.S4, False)
+sense.voltage()
+uart = UARTDevice(Port.S4, 9600, timeout = 10000)
+def UARTtest():
+    uart.write("TEST")
+    wait(100)
+    data = uart.read_all()
+    print(data)
+    ev3.screen.print(data)
 
 # Write your program here
 def main():
-    brick.sound.beep()
-    
-   
-
+    #UARTtest()
 
     x_motor = Motor(Port.C)
     y_motor = Motor(Port.D)
@@ -97,8 +76,6 @@ def main():
     x_ang = 0
     x_spd = 0
     y_spd = 0
-
-
 
     isTurnLeft= False
     isTurnRight= False
@@ -109,69 +86,48 @@ def main():
     lightVal = ''
     while True:
         counter = counter + 1
-        x_ang= x_motor.angle()
-        y_ang= y_motor.angle()
-        print("X Motor is ", x_ang," Y motor is ", y_ang)
-        
-
-        # if x_ang > 70:
-        #     isTurnRight = True
-        # if x_ang < 70:
-        #     isTurnLeft = True
-        # #send angle values or protocol to the other ev3
-
-        #get spd values mapped, send to systemlink
-        yspd = mapper(y_ang)
-
-        x_ang= str(x_ang)
-        y_ang= str(y_ang)
-
-        #Put_SL('angleX', "STRING", str(x_ang))
-        #Put_SL('angleY','STRING',str(y_spd))
+        anglestring, x_ang, y_ang = MotorAngles(x_motor,y_motor)
+        uart.write(anglestring)
 
         #get light value from other ev3
-        lightVal = Get_SL(lightVal)
-        print("Light Value is", lightVal)
+        wait(10)
+       
+        data = uart.read()
+        
+        data = data.decode('utf-8')
 
-        """ while light_value < 100 :
-            x_motor.stop(Stop.BRAKE)
-            y_motor.stop(Stop.BRAKE) """
-
-        if counter%1000 is 0:
-            print("IS BRAKING")
-            x_motor.stop(Stop.BRAKE)
-            y_motor.stop(Stop.BRAKE)
-            x_ang= x_motor.angle()
-            y_ang= y_motor.angle()
-            print("X Motor is ", x_ang," Y motor is ", y_ang)
-            wait(1000)
+        #print("This is DATA:   ", data)
+        #print(type(data))
+        if (data is not '0') and (data is not '1'):
+            data = '100'
+        
+        lightVal = int(data)
+        print("Light Value is: ", lightVal)
+        print(type(lightVal))
+        #lightVal = 1
+        if lightVal is 1:
+            #print("IS BRAKING")
+            #ev3.speaker.say("SHARK")
+            start = time.time()
+            if int(x_ang) > 0:
+                x_motor.run(1000)
+            if int(x_ang) < 0:
+                x_motor.run(-1000)
+            if int(y_ang) >0:
+                y_motor.run(1000)
+            if int(y_ang) < 0:
+                y_motor.run(1000)
+            wait(50)
+            print( time.time() - start , " seconds")
+            
             x_motor.stop()
             y_motor.stop()
+            #x_motor.run_angle(100,10)
+            #y_motor.run_angle(100,10)
+            anglestring, x_ang, y_ang  = MotorAngles(x_motor,y_motor)
+            uart.write(anglestring)
+            
 
-        isTurnLeft= False
-        isTurnRight= False
         
-
-
-
-
-
-
-
-        """ left_color = sensor_left.readvalue()
-        right_color = sensor_right.readvalue()
-        print('left sensor is ', left_color)
-        print('right sensor is ', right_color)
-        left_motor.run(speed)
-        right_motor.run(speed)
-
-        #while left_color > value:  #if left sensor sees the black line
-            #left_motor.run(speed)
-            #right_motor.run(speed + 200) #turn left
-
-        #while right_color > value:  #if right sensor sees the black line
-            #right_motor.run(speed)
-            #left_motor.run(speed + 200)  #turn right """
         
 main()
-
